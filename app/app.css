@@ -30,6 +30,12 @@ h1 {
   @apply text-6xl  text-gradient leading-tight tracking-[-2px] font-semibold;
 }
 
+@media (max-width: 640px) {
+  h1 {
+    @apply text-4xl;
+  }
+}
+
 h2 {
   @apply text-3xl text-dark-200;
 }
@@ -75,7 +81,7 @@ form {
     @apply primary-gradient rounded-full py-4 px-8 cursor-pointer w-[600px] max-md:w-full text-3xl font-semibold text-white;
   }
   .main-section {
-    @apply flex flex-col items-center gap-8 pt-12 mx-15 pb-5;
+    @apply flex flex-col items-center gap-8 pt-12 mx-4 sm:mx-8 pb-5;
   }
   .page-heading {
     @apply flex flex-col items-center gap-8 max-w-4xl text-center;
@@ -109,10 +115,61 @@ form {
   }
 
   .uplader-drag-area {
-    @apply relative p-8 text-center transition-all duration-700 cursor-pointer bg-white rounded-2xl min-h-[208px];
+    @apply relative p-6 text-center transition-colors duration-200 cursor-pointer bg-white rounded-xl min-h-[176px] flex items-center justify-center;
   }
   .uploader-selected-file {
-    @apply flex items-center justify-between p-3 bg-gray-50 rounded-2xl;
+    @apply flex items-center justify-between gap-3 p-3 bg-white rounded-xl border border-slate-200 text-left;
+  }
+
+  .upload-section {
+    @apply pt-6 sm:pt-10;
+  }
+
+  .upload-heading {
+    @apply w-full max-w-3xl gap-5;
+  }
+
+  .upload-heading h1 {
+    @apply text-5xl max-sm:text-4xl;
+  }
+
+  .upload-eyebrow {
+    @apply text-xs font-bold tracking-[0.18em] text-blue-700;
+  }
+
+  .upload-form {
+    @apply grid grid-cols-2 gap-5 rounded-2xl border border-slate-200 bg-white/90 p-5 text-left shadow-lg shadow-slate-900/5 backdrop-blur-sm sm:p-8;
+  }
+
+  .upload-form .form-div {
+    @apply gap-2;
+  }
+
+  .upload-form label {
+    @apply text-sm font-semibold text-slate-800;
+  }
+
+  .upload-form input,
+  .upload-form textarea {
+    @apply rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-none ring-0 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100;
+  }
+
+  .upload-wide {
+    @apply col-span-2;
+  }
+
+  .upload-form .primary-button {
+    @apply rounded-xl py-3 font-semibold;
+  }
+}
+
+@media (max-width: 640px) {
+  .upload-form {
+    @apply grid-cols-1 gap-4 p-4;
+  }
+
+  .upload-wide {
+    @apply col-span-1;
   }
 }
 

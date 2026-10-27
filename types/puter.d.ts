@@ -39,6 +39,14 @@ interface PuterChatOptions {
     stream?: boolean;
     max_tokens?: number;
     temperature?: number;
+    normalize?: boolean;
+    signal?: AbortSignal;
+    outputFormat?: {
+        type: "json_schema";
+        name?: string;
+        strict?: boolean;
+        schema: Record<string, unknown>;
+    };
     tools?: {
         type: "function";
         function: {

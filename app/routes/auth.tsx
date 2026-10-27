@@ -10,12 +10,17 @@ export const meta = () => ([
 const Auth = () => {
     const { isLoading, auth } = usePuterStore();
     const location = useLocation();
-    const next = location.search.split('next=')[1];
     const navigate = useNavigate();
+    const requestedNext = new URLSearchParams(location.search).get('next');
+    const next = requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
+        ? requestedNext
+        : '/';
 
     useEffect(() => {
-        if(auth.isAuthenticated) navigate(next);
-    }, [auth.isAuthenticated, next])
+        if (!isLoading && auth.isAuthenticated) {
+            navigate(next, { replace: true });
+        }
+    }, [isLoading, auth.isAuthenticated, navigate, next]);
 
     return (
         <main className="bg-[url('/images/bg-auth.svg')] bg-cover min-h-screen flex items-center justify-center">

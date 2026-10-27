@@ -5,24 +5,44 @@ export interface PdfConversionResult {
 }
 
 let pdfjsLib: any = null;
-let isLoading = false;
 let loadPromise: Promise<any> | null = null;
 
 async function loadPdfJs(): Promise<any> {
     if (pdfjsLib) return pdfjsLib;
     if (loadPromise) return loadPromise;
 
-    isLoading = true;
     // @ts-expect-error - pdfjs-dist/build/pdf.mjs is not a module
-    loadPromise = import("pdfjs-dist/build/pdf.mjs").then((lib) => {
-        // Set the worker source to use local file
-        lib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        pdfjsLib = lib;
-        isLoading = false;
-        return lib;
-    });
+    loadPromise = import("pdfjs-dist/build/pdf.mjs")
+        .then((lib) => {
+            lib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+            pdfjsLib = lib;
+            return lib;
+        })
+        .catch((error) => {
+            loadPromise = null;
+            throw error;
+        });
 
     return loadPromise;
+}
+
+export async function extractPdfText(file: File): Promise<string> {
+    const lib = await loadPdfJs();
+    const data = await file.arrayBuffer();
+    const pdf = await lib.getDocument({ data }).promise;
+    const pageTexts: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const pageText = content.items
+            .filter((item: { str?: unknown }) => typeof item.str === "string")
+            .map((item: { str: string; hasEOL?: boolean }) => `${item.str}${item.hasEOL ? "\n" : " "}`)
+            .join("");
+        pageTexts.push(pageText);
+    }
+
+    return pageTexts.join("\n\n").replace(/[\t ]+/g, " ").trim();
 }
 
 export async function convertPdfToImage(
@@ -35,19 +55,30 @@ export async function convertPdfToImage(
         const pdf = await lib.getDocument({ data: arrayBuffer }).promise;
         const page = await pdf.getPage(1);
 
-        const viewport = page.getViewport({ scale: 4 });
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = Math.min(
+            2,
+            1800 / Math.max(baseViewport.width, baseViewport.height)
+        );
+        const viewport = page.getViewport({ scale });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
+
+        if (!context) {
+            return {
+                imageUrl: "",
+                file: null,
+                error: "Your browser could not create a PDF preview",
+            };
+        }
 
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
-        if (context) {
-            context.imageSmoothingEnabled = true;
-            context.imageSmoothingQuality = "high";
-        }
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
 
-        await page.render({ canvasContext: context!, viewport }).promise;
+        await page.render({ canvasContext: context, viewport }).promise;
 
         return new Promise((resolve) => {
             canvas.toBlob(
@@ -55,8 +86,8 @@ export async function convertPdfToImage(
                     if (blob) {
                         // Create a File from the blob with the same name as the pdf
                         const originalName = file.name.replace(/\.pdf$/i, "");
-                        const imageFile = new File([blob], `${originalName}.png`, {
-                            type: "image/png",
+                        const imageFile = new File([blob], `${originalName}.jpg`, {
+                            type: "image/jpeg",
                         });
 
                         resolve({
@@ -71,8 +102,8 @@ export async function convertPdfToImage(
                         });
                     }
                 },
-                "image/png",
-                1.0
+                "image/jpeg",
+                0.88
             ); // Set quality to maximum (1.0)
         });
     } catch (err) {

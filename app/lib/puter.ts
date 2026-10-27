@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { FeedbackJsonSchema } from "../../constants";
 
 declare global {
     interface Window {
@@ -25,7 +26,7 @@ declare global {
                     imageURL?: string | PuterChatOptions,
                     testMode?: boolean,
                     options?: PuterChatOptions
-                ) => Promise<Object>;
+                ) => Promise<any>;
                 img2txt: (
                     image: string | File | Blob,
                     testMode?: boolean
@@ -73,9 +74,12 @@ interface PuterStore {
             options?: PuterChatOptions
         ) => Promise<AIResponse | undefined>;
         feedback: (
-            path: string,
-            message: string
-        ) => Promise<AIResponse | undefined>;
+            resumeText: string,
+            message: string,
+            signal?: AbortSignal,
+            onProgress?: (text: string) => void,
+            stream?: boolean
+        ) => Promise<string | undefined>;
         img2txt: (
             image: string | File | Blob,
             testMode?: boolean
@@ -101,19 +105,7 @@ const getPuter = (): typeof window.puter | null =>
 
 export const usePuterStore = create<PuterStore>((set, get) => {
     const setError = (msg: string) => {
-        set({
-            error: msg,
-            isLoading: false,
-            auth: {
-                user: null,
-                isAuthenticated: false,
-                signIn: get().auth.signIn,
-                signOut: get().auth.signOut,
-                refreshUser: get().auth.refreshUser,
-                checkAuthStatus: get().auth.checkAuthStatus,
-                getUser: get().auth.getUser,
-            },
-        });
+        set({ error: msg, isLoading: false });
     };
 
     const checkAuthStatus = async (): Promise<boolean> => {
@@ -327,31 +319,75 @@ export const usePuterStore = create<PuterStore>((set, get) => {
         >;
     };
 
-    const feedback = async (path: string, message: string) => {
+    const feedback = async (
+        resumeText: string,
+        message: string,
+        signal?: AbortSignal,
+        onProgress?: (text: string) => void,
+        stream = true
+    ): Promise<string | undefined> => {
         const puter = getPuter();
         if (!puter) {
             setError("Puter.js not available");
             return;
         }
 
-        return puter.ai.chat(
+        const response = await puter.ai.chat(
             [
                 {
                     role: "user",
-                    content: [
-                        {
-                            type: "file",
-                            puter_path: path,
-                        },
-                        {
-                            type: "text",
-                            text: message,
-                        },
-                    ],
+                    content: `${message}\n\n<resume_document>\n${resumeText}\n</resume_document>`,
                 },
             ],
-            { model: "claude-3-7-sonnet" }
-        ) as Promise<AIResponse | undefined>;
+            {
+                model: "claude-sonnet-5-5",
+                stream,
+                max_tokens: 6000,
+                normalize: true,
+                outputFormat: {
+                    type: "json_schema",
+                    name: "resume_feedback",
+                    strict: true,
+                    schema: FeedbackJsonSchema,
+                },
+                signal,
+            }
+        );
+
+        if (!stream) {
+            const result = response as AIResponse | undefined;
+            const content = result?.message?.content;
+            if (typeof content === "string") return content;
+            if (Array.isArray(content)) {
+                return content
+                    .filter((part) => part?.type === "text" && typeof part.text === "string")
+                    .map((part) => part.text)
+                    .join("");
+            }
+            return undefined;
+        }
+
+        let content = "";
+        for await (const part of response as AsyncIterable<{
+            type?: string;
+            text?: string;
+            message?: string;
+            finish_reason?: string;
+            stopReason?: string;
+        }>) {
+            if (part.type === "error") {
+                throw new Error(part.message || "The AI model failed to analyze the resume");
+            }
+            if (part.type === "usage" && (part.finish_reason === "length" || part.stopReason === "max_tokens")) {
+                throw new Error("The AI response was cut off before it finished. Please try again.");
+            }
+            if (part.type === "text" && part.text) {
+                content += part.text;
+                onProgress?.(content);
+            }
+        }
+
+        return content || undefined;
     };
 
     const img2txt = async (image: string | File | Blob, testMode?: boolean) => {
@@ -438,7 +474,13 @@ export const usePuterStore = create<PuterStore>((set, get) => {
                 testMode?: boolean,
                 options?: PuterChatOptions
             ) => chat(prompt, imageURL, testMode, options),
-            feedback: (path: string, message: string) => feedback(path, message),
+            feedback: (
+                resumeText: string,
+                message: string,
+                signal?: AbortSignal,
+                onProgress?: (text: string) => void,
+                stream?: boolean
+            ) => feedback(resumeText, message, signal, onProgress, stream),
             img2txt: (image: string | File | Blob, testMode?: boolean) =>
                 img2txt(image, testMode),
         },

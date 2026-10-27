@@ -19,8 +19,10 @@ const Resume = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        if(!isLoading && !auth.isAuthenticated) navigate(`/auth?next=/resume/${id}`);
-    }, [isLoading])
+        if (!isLoading && !auth.isAuthenticated) {
+            navigate(`/auth?next=${encodeURIComponent(`/resume/${id}`)}`, { replace: true });
+        }
+    }, [isLoading, auth.isAuthenticated, id, navigate]);
 
     useEffect(() => {
         const loadResume = async () => {
