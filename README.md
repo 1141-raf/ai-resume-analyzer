@@ -48,7 +48,16 @@ No application-specific `.env` file is required by the current code. Puter.js is
 
 ## Getting started
 
-From the repository root:
+### Clone the repository
+
+Make sure Git and Node.js 20 or later are installed, then clone the repository and move into the project directory:
+
+```bash
+git clone https://github.com/1141-raf/ai-resume-analyzer.git
+cd ai-resume-analyzer
+```
+
+### Install dependencies and run locally
 
 ```bash
 npm ci
